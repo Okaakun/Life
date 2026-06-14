@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0a0a0b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Habits</title>
+<style>
+/* ===== Config / tokens ===== */
+:root {
+  --bg: #0a0a0b;
+  --bg-2: #0f0f12;
+  --card: #141417;
+  --card-2: #1a1a1f;
+  --border: rgba(255,255,255,0.08);
+  --border-2: rgba(255,255,255,0.14);
+  --t1: #f4f4f5;
+  --t2: #a1a1aa;
+  --t3: #71717a;
+  --t4: #52525b;
+  --accent: #8b5cf6;
+  --accent-press: #7c3aed;
+  --bad: #f87171;
+  --bad-dim: rgba(248,113,113,0.12);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
+  --mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--t1); font-family: var(--font);
+  font-size: 16px; line-height: 1.4; -webkit-font-smoothing: antialiased;
+  padding-bottom: calc(40px + env(safe-area-inset-bottom));
+}
+.shell { max-width: 680px; margin: 0 auto; padding: 0 16px; padding-top: calc(8px + env(safe-area-inset-top)); }
+button { font-family: inherit; cursor: pointer; color: inherit; }
+input, textarea, select { font-family: inherit; }
+
+/* ===== Header ===== */
+.top { display: flex; align-items: center; gap: 12px; padding: 14px 2px 18px; }
+.brand { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; flex: 1; }
+.brand b { color: var(--accent); font-weight: 800; }
+.icon-btn { width: 38px; height: 38px; border-radius: 11px; border: none; background: rgba(255,255,255,0.06); color: var(--t1); display: inline-flex; align-items: center; justify-content: center; }
+.icon-btn:active { background: rgba(255,255,255,0.12); }
+.icon-btn svg { width: 20px; height: 20px; }
+.add-btn { background: var(--accent); }
+.add-btn:active { background: var(--accent-press); }
+
+/* ===== Category chips ===== */
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 0 2px 14px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: 0 0 auto; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--t2); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.chip.on { background: rgba(255,255,255,0.12); color: var(--t1); border-color: var(--border-2); }
+
+/* ===== Habit cards (grid layout) ===== */
+.habit-list { display: flex; flex-direction: column; gap: 14px; }
+.habit-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 16px; }
+.hc-top { display: flex; align-items: center; gap: 13px; }
+.hc-icon { width: 52px; height: 52px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.hc-icon .ic svg { width: 26px; height: 26px; display: block; }
+.hc-icon .emoji { font-size: 26px; line-height: 1; }
+.hc-text { flex: 1; min-width: 0; }
+.hc-name { font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hc-desc { font-size: 13px; color: var(--t3); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hc-check { width: 52px; height: 52px; border-radius: 14px; border: none; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; transition: transform 0.12s ease, background 0.15s ease; }
+.hc-check:active { transform: scale(0.92); }
+.hc-check svg { width: 24px; height: 24px; }
+.hc-check .cnt { font-family: var(--mono); font-size: 15px; font-weight: 800; }
+.hc-heat { margin-top: 14px; }
+.heatmap { width: 100%; height: auto; display: block; }
+.hm-month { fill: var(--t3); font-size: 9px; font-family: var(--font); }
+.hm-day { fill: var(--t3); font-size: 8.5px; font-family: var(--font); }
+
+.habit-card { transition: box-shadow 0.15s ease; }
+.habit-card.dragging { box-shadow: 0 18px 46px rgba(0,0,0,0.6); opacity: 0.98; cursor: grabbing; }
+
+.empty { color: var(--t3); font-size: 14px; text-align: center; padding: 60px 24px; line-height: 1.6; }
+
+/* ===== Sheet / modal ===== */
+.overlay { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.55); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity 0.2s ease; display: flex; align-items: flex-end; justify-content: center; }
+.overlay.open { opacity: 1; pointer-events: auto; }
+.sheet { width: 100%; max-width: 680px; max-height: 92vh; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--bg-2); border: 1px solid var(--border-2); border-bottom: none; border-radius: 24px 24px 0 0; padding: 20px 18px calc(24px + env(safe-area-inset-bottom)); transform: translateY(20px); transition: transform 0.26s cubic-bezier(0.32,0.72,0,1); }
+.overlay.open .sheet { transform: translateY(0); }
+
+.sheet-title { font-size: 18px; font-weight: 800; text-align: center; }
+.field-label { font-size: 13px; font-weight: 600; color: var(--t2); margin: 18px 0 7px; }
+.field-input { width: 100%; padding: 13px 14px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); outline: none; color: var(--t1); font-size: 15px; }
+.field-input:focus { border-color: rgba(139,92,246,0.5); }
+textarea.field-input { resize: none; min-height: 80px; }
+.sheet-actions { display: flex; gap: 10px; margin-top: 22px; }
+.btn-soft { flex: 1; padding: 14px; border-radius: 13px; border: none; background: rgba(255,255,255,0.08); color: var(--t1); font-size: 15px; font-weight: 700; }
+.btn-primary { flex: 1; padding: 14px; border-radius: 13px; border: none; background: var(--accent); color: #fff; font-size: 15px; font-weight: 800; }
+.btn-primary:active { background: var(--accent-press); }
+.btn-primary:disabled { background: rgba(139,92,246,0.35); color: rgba(255,255,255,0.6); }
+.btn-danger { width: 100%; padding: 13px; border-radius: 13px; border: 1px solid rgba(248,113,113,0.25); background: var(--bad-dim); color: var(--bad); font-size: 14px; font-weight: 700; margin-top: 14px; }
+.link-btn { background: none; border: none; color: var(--accent); font-size: 15px; font-weight: 700; padding: 4px; }
+
+/* confirm */
+.confirm-title { font-size: 18px; font-weight: 800; text-align: center; margin-bottom: 8px; }
+.confirm-body { font-size: 14px; color: var(--t2); text-align: center; line-height: 1.55; margin-bottom: 18px; }
+.confirm-stack { display: flex; flex-direction: column; gap: 10px; }
+.btn-confirm-red { padding: 14px; border-radius: 13px; background: var(--bad-dim); border: 1px solid rgba(248,113,113,0.25); color: var(--bad); font-size: 15px; font-weight: 800; }
+.btn-confirm-grey { padding: 14px; border-radius: 13px; border: none; background: rgba(255,255,255,0.1); color: var(--t1); font-size: 15px; font-weight: 700; }
+.btn-confirm-accent { padding: 14px; border-radius: 13px; border: none; background: var(--accent); color: #fff; font-size: 15px; font-weight: 800; }
+
+/* ===== Edit habit ===== */
+.eh-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.eh-icon-pick { display: flex; justify-content: center; margin: 18px 0 6px; }
+.eh-icon-btn { width: 96px; height: 96px; border-radius: 50%; border: none; background: var(--card-2); display: inline-flex; align-items: center; justify-content: center; }
+.eh-icon-btn .ic svg { width: 42px; height: 42px; }
+.eh-icon-btn .emoji { font-size: 44px; }
+.eh-icon-hint { text-align: center; font-size: 12px; color: var(--t3); margin-bottom: 6px; }
+.color-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+.swatch { aspect-ratio: 1; border-radius: 12px; border: none; position: relative; }
+.swatch.on::after { content: ''; position: absolute; inset: 0; margin: auto; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); }
+.adv-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 22px 0 4px; color: var(--t3); font-size: 14px; font-weight: 600; background: none; border: none; width: 100%; }
+.adv-toggle svg { width: 14px; height: 14px; transition: transform 0.2s; }
+.adv-toggle.open svg { transform: rotate(180deg); }
+.adv-body { display: none; }
+.adv-body.open { display: block; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.picker-row { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 14px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--t1); font-size: 15px; font-weight: 600; }
+.picker-row .chev { color: var(--t3); }
+.seg { display: flex; gap: 4px; background: rgba(255,255,255,0.05); border-radius: 12px; padding: 4px; margin-top: 7px; }
+.seg button { flex: 1; padding: 11px; border-radius: 9px; border: none; background: none; color: var(--t2); font-size: 14px; font-weight: 700; }
+.seg button.on { background: rgba(255,255,255,0.12); color: var(--t1); }
+.hint { font-size: 12.5px; color: var(--t3); text-align: center; margin-top: 8px; }
+.stepper { display: flex; align-items: center; gap: 10px; margin-top: 7px; }
+.stepper .val { flex: 1; padding: 13px 14px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); font-size: 16px; font-weight: 700; }
+.stepper .val small { color: var(--t3); font-weight: 500; }
+.step-b { width: 52px; height: 50px; border-radius: 12px; border: none; background: rgba(255,255,255,0.08); color: var(--t1); font-size: 22px; font-weight: 700; }
+
+/* ===== Icon picker ===== */
+.ip-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.ip-tabs { flex: 1; display: flex; gap: 4px; background: rgba(255,255,255,0.06); border-radius: 11px; padding: 4px; }
+.ip-tab { flex: 1; padding: 9px; border-radius: 8px; border: none; background: none; color: var(--t2); font-weight: 700; font-size: 14px; }
+.ip-tab.on { background: rgba(255,255,255,0.16); color: var(--t1); }
+.ip-cat { font-size: 12px; font-weight: 700; color: var(--t3); text-transform: uppercase; letter-spacing: 0.05em; margin: 16px 0 8px; }
+.ip-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+.ip-cell { aspect-ratio: 1; border-radius: 11px; border: none; background: rgba(255,255,255,0.04); color: var(--t1); display: inline-flex; align-items: center; justify-content: center; }
+.ip-cell.on { box-shadow: inset 0 0 0 2px var(--t1); }
+.ip-cell svg { width: 22px; height: 22px; }
+.ip-cell .emoji { font-size: 22px; }
+
+/* ===== Habit detail ===== */
+.hd-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.hd-icon { width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.hd-icon .ic svg { width: 23px; height: 23px; }
+.hd-icon .emoji { font-size: 23px; }
+.hd-titles { flex: 1; min-width: 0; }
+.hd-name { font-size: 21px; font-weight: 800; letter-spacing: -0.01em; }
+.hd-desc { font-size: 14px; color: var(--t3); margin-top: 1px; }
+.hd-heat { overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.hd-heat::-webkit-scrollbar { display: none; }
+.hd-heat .heatmap { min-width: 320px; }
+.hd-stats { display: flex; align-items: center; gap: 10px; margin: 16px 0 4px; }
+.hd-pill { padding: 9px 14px; border-radius: 999px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); font-size: 13px; font-weight: 600; color: var(--t2); }
+.hd-flame { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); font-size: 14px; font-weight: 800; }
+.hd-flame svg { width: 16px; height: 16px; color: #fb923c; }
+.hd-spacer { flex: 1; }
+.divider { height: 1px; background: var(--border); margin: 18px 0; }
+.cal-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
+.cal-month { padding: 9px 14px; border-radius: 11px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); font-size: 14px; font-weight: 700; }
+.cal-arrows { display: flex; gap: 8px; }
+.cal-head { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 6px; }
+.cal-head span { text-align: center; font-size: 11px; font-weight: 700; color: var(--t3); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-cell { aspect-ratio: 1; border-radius: 11px; border: 1px solid transparent; background: transparent; color: var(--t2); font-size: 15px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+.cal-cell.empty { background: none; }
+.cal-cell.today { box-shadow: inset 0 0 0 2px var(--t2); border-radius: 50%; color: var(--t1); font-weight: 800; }
+.cal-cell.future { color: var(--t4); opacity: 0.45; }
+.cal-cell:not(.empty):not(.future):active { transform: scale(0.94); }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(28px + env(safe-area-inset-bottom)); z-index: 200; background: var(--card-2); border: 1px solid var(--border-2); color: var(--t1); padding: 11px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+
+/* ===== Detail metrics ===== */
+.hd-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0 4px; }
+.hd-metric { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 14px; padding: 12px 8px; text-align: center; }
+.hm-v { font-size: 20px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.hm-v .flame { width: 16px; height: 16px; color: #fb923c; }
+.hm-l { font-size: 11px; color: var(--t3); font-weight: 600; margin-top: 3px; }
+
+/* ===== Rest-day selector ===== */
+.rd-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.rd-day { aspect-ratio: 1; border-radius: 10px; border: 1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--t2); font-size: 13px; font-weight: 700; }
+.rd-day.on { background: rgba(139,92,246,0.22); border-color: rgba(139,92,246,0.5); color: var(--t1); }
+.cal-cell.rest { color: var(--t4); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.07); }
+
+/* ===== Overview chart ===== */
+.chart-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 16px; }
+.sec-head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 2px 14px; }
+.sec-title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+.ov-now { font-family: var(--mono); font-size: 18px; font-weight: 800; color: var(--accent); }
+.ov-seg { margin: 0 0 14px; }
+.ov-chart-wrap { width: 100%; }
+.ov-svg { width: 100%; height: 170px; display: block; }
+.ov-empty { font-size: 13px; color: var(--t3); text-align: center; padding: 48px 16px; }
+.ov-x { display: flex; justify-content: space-between; margin-top: 6px; }
+.ov-x span { font-size: 10.5px; color: var(--t4); font-family: var(--mono); }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="top">
+    <div class="brand">Habits</div>
+    <button class="icon-btn add-btn" id="btnAdd" aria-label="New habit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg></button>
+  </div>
+  <div class="chips" id="chips"></div>
+  <div class="habit-list grid" id="habitList"></div>
+  <div id="overviewChart" style="margin-top:26px"></div>
+</div>
+
+<div class="overlay" id="overlay"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  const KEY = 'habit_tracker_v1';
+  const PALETTE = ['#f87171','#fb923c','#f59e0b','#fbbf24','#a3e635','#4ade80','#34d399','#2dd4bf','#22d3ee','#38bdf8','#3b82f6','#6366f1','#8b5cf6','#a78bfa','#c084fc','#e879f9','#f472b6','#fb7185','#94a3b8','#a8a29e','#d4d4d8'];
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  // ---- Icon library (stroke SVG inner markup) ----
+  const ICON_CATS = [
+    ['Activity', {
+      pulse: '<path d="M3 12h4l2 6 4-14 2 8h6"/>',
+      book: '<path d="M4 5a2 2 0 0 1 2-2h11v16H6a2 2 0 0 0-2 2V5z"/><path d="M17 3v16"/>',
+      code: '<path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/>',
+      terminal: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/>',
+      brain: '<path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-1 5 3 3 0 0 0 2 4 3 3 0 0 0 4 1V4z"/><path d="M15 4a3 3 0 0 1 3 3 3 3 0 0 1 1 5 3 3 0 0 1-2 4 3 3 0 0 1-4 1V4z"/>',
+      gamepad: '<rect x="2" y="7" width="20" height="10" rx="3"/><path d="M7 11v2M6 12h2M15 11h.01M18 13h.01"/>',
+      headphones: '<path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="4" height="6" rx="1.5"/><rect x="17" y="14" width="4" height="6" rx="1.5"/>',
+      laptop: '<rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 20h20"/>',
+      graduation: '<path d="M12 4l10 5-10 5L2 9z"/><path d="M6 11v5c0 1 3 3 6 3s6-2 6-3v-5"/>',
+      pencil: '<path d="M4 20l4-1L19 8l-3-3L5 16z"/><path d="M14 7l3 3"/>',
+      bed: '<path d="M3 18V8M3 12h11a4 4 0 0 1 4 4v2H3M21 18v-4"/><circle cx="7" cy="9.5" r="1.5"/>',
+      wrench: '<path d="M15 6a4 4 0 0 0-5 5L4 17l3 3 6-6a4 4 0 0 0 5-5l-2.5 2.5L13 8.5z"/>'
+    }],
+    ['Health & Sport', {
+      dumbbell: '<path d="M6 8v8M4 7v10M9 12h6M18 8v8M20 7v10"/>',
+      run: '<circle cx="15" cy="4" r="2"/><path d="M15 6l-3 4 2 3 1 5M12 10l-4 1-2 4M14 13l4 1"/>',
+      walk: '<circle cx="13" cy="4" r="2"/><path d="M13 6l-2 5 3 2v5M11 11l-3 2-1 4M14 9l3 1"/>',
+      bike: '<circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17l4-8h5l-2 8M9 9h5M15 9l3 8"/>',
+      swim: '<circle cx="8" cy="7" r="2"/><path d="M5 13l4-2 3 2 3-2 4 1M3 18c1 .8 2 .8 3 0s2-.8 3 0 2 .8 3 0 2-.8 3 0 2 .8 3 0"/>',
+      yoga: '<circle cx="12" cy="4" r="2"/><path d="M12 6v6M6 18l6-6 6 6M4 18h16"/>',
+      heart: '<path d="M12 20s-7-4.5-9.5-9C1 8 3 5 6 5c2 0 3 1 4 2.5C11 6 12 5 14 5c3 0 5 3 3.5 6C19 15.5 12 20 12 20z"/>',
+      pill: '<rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(45 12 12)"/><path d="M8.5 8.5l7 7"/>',
+      water: '<path d="M7 4h10l-1 16H8z"/><path d="M6 9h12"/>',
+      tooth: '<path d="M7 3c2 0 2 1 5 1s3-1 5-1c2 0 3 2 3 5 0 5-2 13-4 13-1.5 0-1.5-5-4-5s-2.5 5-4 5c-2 0-4-8-4-13 0-3 1-5 3-5z"/>',
+      sleep: '<path d="M20 14a8 8 0 0 1-10-10 8 8 0 1 0 10 10z"/>',
+      target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/>'
+    }],
+    ['Food & Drink', {
+      apple: '<path d="M12 7c0-2 1-3 3-3M12 7C9 5 5 6 5 11c0 5 3 9 7 9s7-4 7-9c0-4-4-5-7-3z"/>',
+      carrot: '<path d="M11 11l-6 8 9-5z"/><path d="M11 11c-2-2-2-5 0-6 2 1 2 4 0 6zM14 8c1-2 4-2 5-1-1 2-3 3-5 1z"/>',
+      avocado: '<path d="M12 3c4 0 7 4 6 9-1 5-3 9-6 9s-5-4-6-9c-1-5 2-9 6-9z"/><circle cx="12" cy="14" r="3"/>',
+      coffee: '<path d="M5 8h12v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z"/><path d="M17 9h2a2 2 0 0 1 0 4h-2M8 3v2M11 3v2"/>',
+      tea: '<path d="M4 9h12v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M16 10h3a2 2 0 0 1 0 4h-3M6 20h12"/>',
+      bread: '<path d="M5 11a3.5 3.5 0 0 1 0-2c0-2 3-3 7-3s7 1 7 3a3.5 3.5 0 0 1 0 2v8H5z"/>',
+      pizza: '<path d="M3 5l9 16 9-16c-5-2-13-2-18 0z"/><circle cx="10" cy="9" r="1"/><circle cx="13" cy="13" r="1"/>',
+      beer: '<path d="M6 6h9v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/><path d="M15 9h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2M8 3v3M11 3v3"/>',
+      salad: '<path d="M4 11h16a8 8 0 0 1-16 0z"/><path d="M9 7c0-2 2-3 3-3M14 8c1-1 3-1 4 0M7 9c-1-1-1-3 0-4"/>',
+      nosmoke: '<circle cx="12" cy="12" r="9"/><path d="M6 6l12 12M7 14h6"/>'
+    }],
+    ['Creative', {
+      music: '<path d="M9 18V6l11-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>',
+      brush: '<path d="M14 4l6 6-7 7-3 1-3-3 1-3z"/><path d="M4 20l3-3"/>',
+      camera: '<rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13" r="4"/><path d="M8 7l2-3h4l2 3"/>',
+      palette: '<path d="M12 3a9 9 0 0 0 0 18c1.5 0 2-1 2-2 0-1.5 1-2 2-2h2a3 3 0 0 0 3-3c0-5-4-9-9-9z"/><circle cx="7.5" cy="11" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="16" cy="11" r="1"/>',
+      film: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/>',
+      image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.5"/><path d="M21 16l-5-5L5 20"/>',
+      pen: '<path d="M12 19l7-7-4-4-7 7-1 5z"/><path d="M15 5l4 4"/>',
+      plant: '<path d="M12 20v-8M12 12C12 8 9 5 4 5c0 5 3 7 8 7zM12 12c0-3 2-6 7-6 0 4-3 6-7 6z"/>'
+    }],
+    ['Finance', {
+      cash: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9v6M18 9v6"/>',
+      card: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
+      dollar: '<path d="M12 3v18M16 7c0-2-2-3-4-3s-4 1-4 3 2 3 4 3 4 1 4 3-2 3-4 3-4-1-4-3"/>',
+      bitcoin: '<circle cx="12" cy="12" r="9"/><path d="M9 7h5a2.5 2.5 0 0 1 0 5H9zM9 12h5.5a2.5 2.5 0 0 1 0 5H9M9 7v10M11 5v2M11 17v2"/>',
+      wallet: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 9h18M16 13h2"/>',
+      piggy: '<path d="M4 12a6 6 0 0 1 6-6h3a6 6 0 0 1 6 6v2a3 3 0 0 1-1 2v2h-3v-2H9v2H6v-2a6 6 0 0 1-2-4z"/><path d="M20 11h1M13 6V4"/>',
+      chart: '<path d="M4 20V10M9 20V4M14 20v-7M19 20V8"/>'
+    }],
+    ['Misc', {
+      star: '<path d="M12 3l2.5 6 6.5.5-5 4 1.5 6.5L12 16l-5.5 4L8 13.5 3 9.5 9.5 9z"/>',
+      flame: '<path d="M12 3c1 3 4 4 4 8a4 4 0 0 1-8 0c0-1 .5-2 1-3 .5 2 2 2 2 0 0-2-1-3 1-5z"/>',
+      sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/>',
+      moon: '<path d="M20 14a8 8 0 0 1-10-10 8 8 0 1 0 10 10z"/>',
+      leaf: '<path d="M4 20c0-9 7-16 16-16 0 9-7 16-16 16z"/><path d="M4 20c4-4 8-6 12-7"/>',
+      dog: '<path d="M10 5L7 4 5 6v3l-2 2 2 2v5h5l2 2 2-2h3v-5l2-2-2-2V6l-2-2-3 1z"/><circle cx="9" cy="11" r="1"/><circle cx="14" cy="11" r="1"/>',
+      gift: '<rect x="3" y="8" width="18" height="13" rx="1"/><path d="M3 12h18M12 8v13M12 8C12 5 9 3 8 5s1 3 4 3zM12 8c0-3 3-5 4-3s-1 3-4 3z"/>',
+      bell: '<path d="M6 10a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+      globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+      rocket: '<path d="M12 3c3 1 5 4 5 8l-2 4H9l-2-4c0-4 2-7 5-8z"/><path d="M9 15l-2 4M15 15l2 4"/><circle cx="12" cy="9" r="1"/>',
+      check: '<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',
+      alarm: '<circle cx="12" cy="13" r="7"/><path d="M12 10v3l2 2M5 4L3 6M19 4l2 2M9 21h6"/>'
+    }]
+  ];
+  const ICONS = {};
+  ICON_CATS.forEach(([, map]) => Object.keys(map).forEach(k => { ICONS[k] = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + map[k] + '</svg>'; }));
+
+  const EMOJI = [
+    ['💪','muscle'],['🏋️','gym lift'],['🏃','run'],['🚴','bike cycle'],['🧘','yoga meditate'],['🚶','walk'],['🏊','swim'],['⚽','soccer football'],['🏀','basketball'],['🎾','tennis'],['⛹️','sport'],['🧗','climb'],['🥊','box'],
+    ['📚','book read study'],['✍️','write journal'],['💻','code work'],['🧠','brain learn'],['🎯','target goal'],['📖','read'],['📝','note'],['💡','idea'],
+    ['💧','water drink'],['🥗','salad eat'],['🍎','apple fruit'],['🥦','veg'],['☕','coffee'],['🍵','tea'],['🥤','drink'],['🚭','no smoke'],['💊','pill meds'],['🩺','health doctor'],
+    ['😴','sleep'],['🛏️','bed'],['🪥','teeth brush'],['🚿','shower'],['🦷','tooth'],['🧴','skincare'],
+    ['🎸','guitar music'],['🎹','piano'],['🎨','art paint'],['📷','camera photo'],['🎬','film movie'],['🎵','music'],['🎮','game'],
+    ['💰','money save'],['📈','chart invest'],['🧹','clean chore'],['🌱','plant grow'],['☀️','sun morning'],['🌙','moon night'],['🔥','fire streak'],['⭐','star'],['❤️','heart love'],['🙏','pray gratitude'],['🐕','dog walk'],['🐈','cat'],['🌍','earth world'],['🏆','trophy win'],['✅','done check']
+  ];
+
+  // ---- State ----
+  let state = load();
+  let activeCategory = null;
+  let ovRange = 'day';
+  const OV_RANGES = [['Daily', 'day'], ['Weekly', 'week'], ['Monthly', 'month'], ['All', 'all']];
+  let detailRefresh = null;
+  let justDragged = false;
+  let dragCtx = null;
+
+  function load() {
+    let s = {};
+    try { s = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { s = {}; }
+    s.habits = Array.isArray(s.habits) ? s.habits : [];
+    s.habits.forEach((h, i) => {
+      if (typeof h.order !== 'number') h.order = i;
+      if (!Array.isArray(h.restDays)) h.restDays = [];
+      if (!h.createdAt) {
+        const keys = Object.keys((s.logs && s.logs[h.id]) || {});
+        h.createdAt = keys.length ? Math.min(...keys.map(k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d).getTime(); })) : Date.now();
+      }
+    });
+    s.logs = s.logs && typeof s.logs === 'object' ? s.logs : {};
+    s.settings = s.settings || {};
+    s.settings.weekStart = s.settings.weekStart || 'mon';
+    s.settings.layout = s.settings.layout || 'grid';
+    return s;
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  // ---- Helpers ----
+  const $ = id => document.getElementById(id);
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function ymd(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function parseYmd(k) { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); }
+  function todayMid() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+  function uid(p) { return (p || 'h') + Math.random().toString(36).slice(2, 9); }
+  function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function weekStartOf(d) {
+    const ws = state.settings.weekStart;
+    const day = d.getDay();
+    const diff = ws === 'mon' ? ((day + 6) % 7) : day;
+    const r = new Date(d); r.setHours(0, 0, 0, 0); r.setDate(r.getDate() - diff); return r;
+  }
+  function hexToRgba(hex, a) {
+    const h = hex.replace('#', '');
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+  }
+  function habitTarget(h) { return h.tracking === 'value' ? (h.target || 1) : (h.perDay || 1); }
+  function restSet(h) { return new Set(h.restDays || []); }
+  function habitStart(h) {
+    let t = h.createdAt ? new Date(h.createdAt) : null;
+    const logs = state.logs[h.id] || {}; const keys = Object.keys(logs);
+    if (keys.length) { const e = parseYmd(keys.sort()[0]); if (!t || e < t) t = e; }
+    if (!t) t = todayMid();
+    t = new Date(t); t.setHours(0, 0, 0, 0); return t;
+  }
+  function scheduledOn(h, d) { return d >= habitStart(h) && d <= todayMid() && !restSet(h).has(d.getDay()); }
+  function completedOn(h, d) { const a = (state.logs[h.id] || {})[ymd(d)] || 0; return a > 0 && a >= habitTarget(h); }
+  function smoothPath(pts) {
+    if (!pts.length) return '';
+    if (pts.length === 1) return 'M ' + pts[0].x + ' ' + pts[0].y;
+    let d = 'M ' + pts[0].x.toFixed(1) + ' ' + pts[0].y.toFixed(1);
+    for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], cx = (a.x + b.x) / 2; d += ' Q ' + cx.toFixed(1) + ' ' + a.y.toFixed(1) + ', ' + cx.toFixed(1) + ' ' + ((a.y + b.y) / 2).toFixed(1) + ' T ' + b.x.toFixed(1) + ' ' + b.y.toFixed(1); }
+    return d;
+  }
+  function longestStreak(h) {
+    if ((h.restDays || []).length >= 7) return 0;
+    const logs = state.logs[h.id] || {}; const keys = Object.keys(logs).filter(k => logs[k] > 0);
+    if (!keys.length) return 0;
+    let d = parseYmd(keys.sort()[0]); const today = todayMid(); const rest = restSet(h);
+    let best = 0, cur = 0, guard = 0;
+    while (d <= today && guard++ < 20000) {
+      if (rest.has(d.getDay())) { d.setDate(d.getDate() + 1); continue; }
+      if (completedOn(h, d)) { cur++; if (cur > best) best = cur; } else cur = 0;
+      d.setDate(d.getDate() + 1);
+    }
+    return best;
+  }
+  function monthlyCompletion(h) {
+    const now = todayMid(); const y = now.getFullYear(), m = now.getMonth(); const rest = restSet(h);
+    let sched = 0, done = 0;
+    for (let day = 1; day <= now.getDate(); day++) { const d = new Date(y, m, day); if (d < habitStart(h) || rest.has(d.getDay())) continue; sched++; if (completedOn(h, d)) done++; }
+    return sched ? Math.round(done / sched * 100) : 0;
+  }
+  function amountFor(h, key) { return (state.logs[h.id] || {})[key] || 0; }
+  function fracFor(h, amt) { const t = habitTarget(h); return t > 0 ? Math.min(amt / t, 1) : (amt > 0 ? 1 : 0); }
+  function cellColor(h, amt) {
+    if (amt <= 0) return hexToRgba(h.color, 0.10);
+    return hexToRgba(h.color, 0.28 + 0.72 * fracFor(h, amt));
+  }
+  function iconMarkup(icon, color) {
+    if (icon && icon.type === 'emoji') return '<span class="emoji">' + icon.value + '</span>';
+    const key = (icon && icon.value) || 'pulse';
+    return '<span class="ic" style="color:' + (color || 'var(--t1)') + '">' + (ICONS[key] || ICONS.pulse) + '</span>';
+  }
+  function currentStreak(h) {
+    if ((h.restDays || []).length >= 7) return 0;
+    const t = habitTarget(h); const rest = restSet(h);
+    const done = d => completedOn(h, d);
+    let d = todayMid();
+    if (!rest.has(d.getDay()) && !done(d)) d.setDate(d.getDate() - 1);
+    let n = 0, guard = 0;
+    while (guard++ < 20000) {
+      if (rest.has(d.getDay())) { d.setDate(d.getDate() - 1); continue; }   // rest days are transparent
+      if (done(d)) { n++; d.setDate(d.getDate() - 1); } else break;
+    }
+    return n;
+  }
+
+  // ---- Heatmap (SVG) ----
+  function heatmapSVG(h, weeks, labels) {
+    const today = todayMid();
+    const thisWeek = weekStartOf(today);
+    const first = new Date(thisWeek); first.setDate(first.getDate() - (weeks - 1) * 7);
+    const c = labels ? 13 : 11, g = 3;
+    const leftPad = labels ? 28 : 0, topPad = labels ? 16 : 0;
+    const W = leftPad + weeks * (c + g) - g;
+    const H = topPad + 7 * (c + g) - g;
+    let cells = '', monthLabels = '', dayLabels = '', lastMonth = -1;
+    for (let col = 0; col < weeks; col++) {
+      const colStart = new Date(first); colStart.setDate(colStart.getDate() + col * 7);
+      if (labels && colStart.getMonth() !== lastMonth && colStart.getDate() <= 7) {
+        lastMonth = colStart.getMonth();
+        monthLabels += '<text class="hm-month" x="' + (leftPad + col * (c + g)) + '" y="11">' + MONTHS[colStart.getMonth()] + '</text>';
+      }
+      for (let row = 0; row < 7; row++) {
+        const d = new Date(colStart); d.setDate(d.getDate() + row);
+        const x = leftPad + col * (c + g), y = topPad + row * (c + g);
+        let fill;
+        if (d > today) fill = hexToRgba(h.color, 0.04);
+        else fill = cellColor(h, amountFor(h, ymd(d)));
+        cells += '<rect class="hm-cell" data-date="' + ymd(d) + '" x="' + x + '" y="' + y + '" width="' + c + '" height="' + c + '" rx="2.5" fill="' + fill + '"' + (d > today ? ' data-future="1"' : '') + '/>';
+      }
+    }
+    if (labels) {
+      [['Mon', 0], ['Wed', 2], ['Fri', 4], ['Sun', 6]].forEach(([lbl, row]) => {
+        dayLabels += '<text class="hm-day" x="0" y="' + (topPad + row * (c + g) + c - 2) + '">' + lbl + '</text>';
+      });
+    }
+    return '<svg class="heatmap" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">' + monthLabels + dayLabels + cells + '</svg>';
+  }
+
+  // ---- Render home ----
+  function render() { renderChips(); renderHabits(); renderOverview(); }
+  function renderChips() {
+    const cats = [...new Set(state.habits.map(h => h.category).filter(Boolean))];
+    const wrap = $('chips');
+    if (!cats.length) { wrap.innerHTML = ''; wrap.style.display = 'none'; return; }
+    wrap.style.display = 'flex';
+    wrap.innerHTML = '<button class="chip' + (!activeCategory ? ' on' : '') + '" data-cat="">All</button>' +
+      cats.map(c => '<button class="chip' + (activeCategory === c ? ' on' : '') + '" data-cat="' + escapeHtml(c) + '">' + escapeHtml(c) + '</button>').join('');
+    wrap.querySelectorAll('.chip').forEach(ch => ch.onclick = () => { activeCategory = ch.dataset.cat || null; render(); });
+  }
+
+  function checkButton(h) {
+    const key = ymd(todayMid());
+    const amt = amountFor(h, key);
+    const t = habitTarget(h);
+    const frac = fracFor(h, amt);
+    const bg = amt > 0 ? hexToRgba(h.color, 0.18 + 0.5 * frac) : hexToRgba(h.color, 0.12);
+    let inner;
+    if (h.tracking === 'value') {
+      inner = amt > 0 ? '<span class="cnt" style="color:' + h.color + '">' + fmtVal(amt) + '</span>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="' + hexToRgba(h.color, 0.55) + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>';
+    } else if (t > 1) {
+      inner = amt >= t ? '<svg viewBox="0 0 24 24" fill="none" stroke="' + h.color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>'
+        : '<span class="cnt" style="color:' + (amt > 0 ? h.color : hexToRgba(h.color, 0.6)) + '">' + amt + '/' + t + '</span>';
+    } else {
+      inner = '<svg viewBox="0 0 24 24" fill="none" stroke="' + (amt > 0 ? h.color : hexToRgba(h.color, 0.5)) + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>';
+    }
+    return '<button class="hc-check" data-check="' + h.id + '" style="background:' + bg + '">' + inner + '</button>';
+  }
+  function fmtVal(n) { return Number.isInteger(n) ? String(n) : n.toFixed(1); }
+
+  function habitCardHtml(h) {
+    const desc = h.description ? '<div class="hc-desc">' + escapeHtml(h.description) + '</div>' : '';
+    return '<div class="habit-card" data-open="' + h.id + '">' +
+      '<div class="hc-top">' +
+        '<span class="hc-icon" style="background:' + hexToRgba(h.color, 0.16) + '">' + iconMarkup(h.icon, h.color) + '</span>' +
+        '<div class="hc-text"><div class="hc-name">' + escapeHtml(h.name) + '</div>' + desc + '</div>' +
+        checkButton(h) +
+      '</div>' +
+      '<div class="hc-heat">' + heatmapSVG(h, 30, false) + '</div>' +
+    '</div>';
+  }
+
+  function sortedHabits() { return state.habits.slice().sort((a, b) => (a.order || 0) - (b.order || 0)); }
+  function renderHabits() {
+    const wrap = $('habitList');
+    wrap.className = 'habit-list grid';
+    let list = sortedHabits();
+    const filtered = !!activeCategory;
+    if (filtered) list = list.filter(h => h.category === activeCategory);
+    if (!list.length) {
+      wrap.innerHTML = '<div class="empty">' + (state.habits.length ? 'No habits in this category.' : 'No habits yet.<br>Tap the + button to create your first one.') + '</div>';
+      return;
+    }
+    wrap.innerHTML = list.map(h => habitCardHtml(h)).join('');
+    wrap.querySelectorAll('[data-check]').forEach(b => b.onclick = (e) => { e.stopPropagation(); logToday(b.dataset.check); });
+    wrap.querySelectorAll('[data-open]').forEach(c => {
+      c.onclick = () => { if (justDragged) return; openHabitDetail(c.dataset.open); };
+      if (!filtered) attachDrag(c);   // long-press to reorder (only in the unfiltered list)
+    });
+  }
+
+  // ---- Drag to reorder (long-press) ----
+  function attachDrag(card) {
+    let timer = null, sx = 0, sy = 0, moved = false, dragging = false;
+    const clear = () => { clearTimeout(timer); timer = null; };
+    function down(x, y) {
+      sx = x; sy = y; moved = false; dragging = false;
+      timer = setTimeout(() => { if (!moved) { dragging = true; beginDrag(card, y); } }, 240);
+    }
+    function move(x, y, e) {
+      if (!dragging) { if (Math.abs(y - sy) > 10 || Math.abs(x - sx) > 10) { moved = true; clear(); } return; }
+      if (e && e.cancelable) e.preventDefault();
+      dragMove(y);
+    }
+    function up() { clear(); if (dragging) { dragging = false; endDrag(); justDragged = true; setTimeout(() => { justDragged = false; }, 350); } }
+    card.addEventListener('touchstart', e => { if (e.target.closest('.hc-check')) return; const t = e.touches && e.touches[0]; if (!t) return; down(t.clientX, t.clientY); }, { passive: true });
+    card.addEventListener('touchmove', e => { const t = e.touches && e.touches[0]; if (!t) return; move(t.clientX, t.clientY, e); }, { passive: false });
+    card.addEventListener('touchend', up, { passive: true });
+    card.addEventListener('touchcancel', up, { passive: true });
+    card.addEventListener('mousedown', e => {
+      if (e.target.closest('.hc-check') || e.button !== 0) return;
+      down(e.clientX, e.clientY);
+      const mm = ev => move(ev.clientX, ev.clientY, ev);
+      const mu = () => { up(); document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu); };
+      document.addEventListener('mousemove', mm); document.addEventListener('mouseup', mu);
+    });
+  }
+  function beginDrag(card, y) {
+    const wrap = $('habitList');
+    const cards = [...wrap.querySelectorAll('.habit-card')];
+    const fromIndex = cards.indexOf(card);
+    const rects = cards.map(c => c.getBoundingClientRect());
+    dragCtx = { wrap, card, cards, rects, fromIndex, toIndex: fromIndex, h: rects[fromIndex].height, gap: 14, startY: y };
+    card.style.transition = 'none';
+    card.style.position = 'relative';
+    card.style.zIndex = '50';
+    card.classList.add('dragging');
+    cards.forEach((c, i) => { if (i !== fromIndex) c.style.transition = 'transform 0.18s cubic-bezier(0.32,0.72,0,1)'; });
+    wrap.style.touchAction = 'none';
+    document.body.style.userSelect = 'none';
+  }
+  function dragMove(y) {
+    const c = dragCtx; if (!c) return;
+    const dy = y - c.startY;
+    c.card.style.transform = 'translateY(' + dy + 'px) scale(1.03)';
+    const center = c.rects[c.fromIndex].top + c.rects[c.fromIndex].height / 2 + dy;
+    let to = 0;
+    for (let i = 0; i < c.cards.length; i++) { if (i === c.fromIndex) continue; const mid = c.rects[i].top + c.rects[i].height / 2; if (mid < center) to++; }
+    c.toIndex = to;
+    const amt = c.h + c.gap;
+    c.cards.forEach((cc, i) => {
+      if (i === c.fromIndex) return;
+      let s = 0;
+      if (to > c.fromIndex) { if (i > c.fromIndex && i <= to) s = -amt; }
+      else if (to < c.fromIndex) { if (i >= to && i < c.fromIndex) s = amt; }
+      cc.style.transform = s ? 'translateY(' + s + 'px)' : '';
+    });
+  }
+  function endDrag() {
+    const c = dragCtx; if (!c) return;
+    const ids = c.cards.map(el => el.dataset.open);
+    const [moved] = ids.splice(c.fromIndex, 1);
+    ids.splice(c.toIndex, 0, moved);
+    ids.forEach((id, i) => { const hb = state.habits.find(x => x.id === id); if (hb) hb.order = i; });
+    state.habits.sort((a, b) => (a.order || 0) - (b.order || 0));
+    save();
+    c.wrap.style.touchAction = '';
+    document.body.style.userSelect = '';
+    dragCtx = null;
+    render();
+  }
+
+  // ---- Logging ----
+  function logToday(hid) { cycleDate(state.habits.find(h => h.id === hid), ymd(todayMid())); }
+  function cycleDate(h, key) {
+    if (!h) return;
+    if (h.tracking === 'value') { promptValue(h, key); return; }
+    const prev = h.streakGoal ? currentStreak(h) : 0;
+    const logs = state.logs[h.id] || (state.logs[h.id] = {});
+    const per = h.perDay || 1;
+    let next = (logs[key] || 0) + 1;
+    if (next > per) next = 0;
+    if (next <= 0) delete logs[key]; else logs[key] = next;
+    save(); celebrateIfGoal(h, prev); afterLog();
+  }
+  function promptValue(h, key) {
+    const logs = state.logs[h.id] || (state.logs[h.id] = {});
+    const cur = logs[key] || 0;
+    promptSheet({
+      title: h.name, sub: key === ymd(todayMid()) ? 'Today' : prettyDate(parseYmd(key)),
+      value: cur ? fmtVal(cur) : '', placeholder: 'Value' + (h.unit ? ' (' + h.unit + ')' : ''), numeric: true,
+      onSave: v => { const prev = h.streakGoal ? currentStreak(h) : 0; const n = parseFloat(v); if (!v || isNaN(n) || n <= 0) delete logs[key]; else logs[key] = n; save(); celebrateIfGoal(h, prev); afterLog(); }
+    });
+  }
+  function celebrateIfGoal(h, prev) {
+    if (!h.streakGoal) return;
+    const now = currentStreak(h);
+    if (prev < h.streakGoal && now >= h.streakGoal) { celebrate(); toast('\uD83C\uDF89 ' + h.streakGoal + '-day goal reached!'); }
+  }
+  function celebrate() {
+    const cv = document.createElement('canvas');
+    const ctx = cv.getContext && cv.getContext('2d');
+    if (!ctx) return;   // no canvas (non-visual env) — skip silently
+    const W = window.innerWidth, H = window.innerHeight;
+    cv.width = W; cv.height = H;
+    cv.style.cssText = 'position:fixed;inset:0;z-index:300;pointer-events:none';
+    document.body.appendChild(cv);
+    const colors = ['#8b5cf6', '#a78bfa', '#c084fc', '#34d399', '#fbbf24', '#f472b6', '#38bdf8'];
+    const N = 90, parts = [];
+    for (let i = 0; i < N; i++) parts.push({ x: W / 2 + (Math.random() - 0.5) * 80, y: H * 0.34, vx: (Math.random() - 0.5) * 13, vy: Math.random() * -13 - 3, g: 0.42 + Math.random() * 0.2, c: colors[i % colors.length], s: 5 + Math.random() * 6, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.5 });
+    const start = performance.now();
+    (function frame(t) {
+      const el = t - start; ctx.clearRect(0, 0, W, H);
+      parts.forEach(p => { p.vy += p.g; p.x += p.vx; p.y += p.vy; p.rot += p.vr; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.globalAlpha = Math.max(0, 1 - el / 1500); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.62); ctx.restore(); });
+      if (el < 1500) requestAnimationFrame(frame); else cv.remove();
+    })(start);
+  }
+  function afterLog() { renderHabits(); renderOverview(); if (detailRefresh) detailRefresh(); }
+  function prettyDate(d) { return MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear(); }
+
+  // ---- Habit detail ----
+  function openHabitDetail(hid) {
+    const h = state.habits.find(x => x.id === hid);
+    if (!h) return;
+    let cur = todayMid(); cur = new Date(cur.getFullYear(), cur.getMonth(), 1);
+
+    function streakGoalLabel() { return h.streakGoal ? (currentStreak(h) + ' / ' + h.streakGoal + ' day goal') : 'No streak goal'; }
+    function paint() {
+      openSheet(
+        '<div class="hd-head">' +
+          '<span class="hd-icon" style="background:' + hexToRgba(h.color, 0.18) + '">' + iconMarkup(h.icon, h.color) + '</span>' +
+          '<div class="hd-titles"><div class="hd-name">' + escapeHtml(h.name) + '</div>' +
+            '<div class="hd-desc">' + (h.description ? escapeHtml(h.description) : 'No description') + '</div></div>' +
+          '<button class="icon-btn" id="hdClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
+        '</div>' +
+        '<div class="hd-heat" id="hdHeat">' + heatmapSVG(h, 26, true) + '</div>' +
+        '<div class="hd-stats">' +
+          '<span class="hd-pill">' + streakGoalLabel() + '</span>' +
+          '<span class="hd-spacer"></span>' +
+          '<button class="icon-btn" id="hdEdit" aria-label="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7-4-4-7 7-1 5z"/><path d="M15 5l4 4"/></svg></button>' +
+        '</div>' +
+        '<div class="hd-metrics">' +
+          '<div class="hd-metric"><div class="hm-v"><svg class="flame" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c1 3 4 4 4 8a4 4 0 0 1-8 0c0-1 .5-2 1-3 .5 2 2 2 2 0 0-2-1-3 1-5z"/></svg>' + currentStreak(h) + '</div><div class="hm-l">Current</div></div>' +
+          '<div class="hd-metric"><div class="hm-v">' + longestStreak(h) + '</div><div class="hm-l">Best streak</div></div>' +
+          '<div class="hd-metric"><div class="hm-v">' + monthlyCompletion(h) + '%</div><div class="hm-l">This month</div></div>' +
+        '</div>' +
+        '<div class="divider"></div>' +
+        '<div id="hdCal"></div>' +
+        '<div class="cal-nav"><span class="cal-month" id="hdMonth"></span>' +
+          '<div class="cal-arrows"><button class="icon-btn" id="hdPrev" aria-label="Previous month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg></button>' +
+          '<button class="icon-btn" id="hdNext" aria-label="Next month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button></div>' +
+        '</div>'
+      );
+      paintCal();
+      $('hdClose').onclick = closeSheet;
+      $('hdEdit').onclick = () => openEditHabit(h, () => openHabitDetail(hid));
+      $('hdPrev').onclick = () => { cur = new Date(cur.getFullYear(), cur.getMonth() - 1, 1); paintCal(); };
+      $('hdNext').onclick = () => { cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1); paintCal(); };
+      bindHeatCells();
+    }
+    function paintCal() {
+      $('hdCal').innerHTML = calendarHtml(h, cur.getFullYear(), cur.getMonth());
+      $('hdMonth').textContent = MONTHS_FULL[cur.getMonth()] + ' ' + cur.getFullYear();
+      $('hdCal').querySelectorAll('[data-cal]').forEach(c => c.onclick = () => { cycleDate(h, c.dataset.cal); });
+    }
+    function bindHeatCells() {
+      document.querySelectorAll('#hdHeat .hm-cell').forEach(c => {
+        if (c.dataset.future) return;
+        c.style.cursor = 'pointer';
+        c.onclick = () => cycleDate(h, c.dataset.date);
+      });
+    }
+    detailRefresh = () => { paint(); };
+    paint();
+  }
+
+  function calendarHtml(h, year, month) {
+    const first = new Date(year, month, 1);
+    const ws = state.settings.weekStart;
+    const startDay = ws === 'mon' ? ((first.getDay() + 6) % 7) : first.getDay();
+    const days = new Date(year, month + 1, 0).getDate();
+    const today = ymd(todayMid()), todayTs = todayMid().getTime();
+    const heads = ws === 'mon' ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const rest = restSet(h);
+    let cells = '';
+    for (let i = 0; i < startDay; i++) cells += '<div class="cal-cell empty"></div>';
+    for (let d = 1; d <= days; d++) {
+      const dObj = new Date(year, month, d); const key = ymd(dObj);
+      const amt = amountFor(h, key); const frac = fracFor(h, amt);
+      const future = dObj.getTime() > todayTs;
+      const isRest = rest.has(dObj.getDay());
+      const bg = amt > 0 ? hexToRgba(h.color, 0.25 + 0.6 * frac) : 'transparent';
+      const col = amt > 0 ? (frac > 0.55 ? '#fff' : 'var(--t1)') : '';
+      cells += '<button class="cal-cell' + (key === today ? ' today' : '') + (future ? ' future' : '') + (isRest ? ' rest' : '') + '"' +
+        (future ? ' disabled' : ' data-cal="' + key + '"') +
+        ' style="background:' + bg + (col ? ';color:' + col : '') + '">' + d + '</button>';
+    }
+    return '<div class="cal-head">' + heads.map(x => '<span>' + x + '</span>').join('') + '</div><div class="cal-grid">' + cells + '</div>';
+  }
+
+  function restDayButtons(draft) {
+    const ws = state.settings.weekStart || 'mon';
+    const order = ws === 'mon' ? [1, 2, 3, 4, 5, 6, 0] : [0, 1, 2, 3, 4, 5, 6];
+    const labels = ws === 'mon' ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    const rest = new Set(draft.restDays || []);
+    return order.map((idx, i) => '<button type="button" class="rd-day' + (rest.has(idx) ? ' on' : '') + '" data-rd="' + idx + '">' + labels[i] + '</button>').join('');
+  }
+
+  // ---- Completion overview chart ----
+  function overviewSeries(range) {
+    const habits = state.habits; if (!habits.length) return [];
+    const today = todayMid();
+    function pct(days) {
+      let sched = 0, done = 0;
+      days.forEach(d => { if (d > today) return; habits.forEach(h => { if (!scheduledOn(h, d)) return; sched++; if (completedOn(h, d)) done++; }); });
+      return sched ? (done / sched * 100) : null;
+    }
+    const pts = [];
+    if (range === 'day') {
+      for (let i = 29; i >= 0; i--) { const d = new Date(today); d.setDate(d.getDate() - i); pts.push({ pct: pct([d]), label: (d.getMonth() + 1) + '/' + d.getDate() }); }
+    } else if (range === 'week') {
+      const ws = weekStartOf(today);
+      for (let i = 15; i >= 0; i--) { const s = new Date(ws); s.setDate(s.getDate() - i * 7); const days = []; for (let k = 0; k < 7; k++) { const d = new Date(s); d.setDate(d.getDate() + k); days.push(d); } pts.push({ pct: pct(days), label: MONTHS[s.getMonth()] + ' ' + s.getDate() }); }
+    } else if (range === 'month') {
+      for (let i = 11; i >= 0; i--) { const m = new Date(today.getFullYear(), today.getMonth() - i, 1); const days = monthDays(m); pts.push({ pct: pct(days), label: MONTHS[m.getMonth()] }); }
+    } else {
+      let earliest = today; habits.forEach(h => { const s = habitStart(h); if (s < earliest) earliest = s; });
+      let m = new Date(earliest.getFullYear(), earliest.getMonth(), 1), guard = 0;
+      while (m <= today && guard++ < 600) { const days = monthDays(m); pts.push({ pct: pct(days), label: MONTHS[m.getMonth()] + " '" + String(m.getFullYear()).slice(2) }); m = new Date(m.getFullYear(), m.getMonth() + 1, 1); }
+    }
+    return pts.filter(p => p.pct !== null);
+  }
+  function monthDays(m) { const dim = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate(); const a = []; for (let dd = 1; dd <= dim; dd++) a.push(new Date(m.getFullYear(), m.getMonth(), dd)); return a; }
+  function renderOverview() {
+    const host = $('overviewChart'); if (!host) return;
+    if (!state.habits.length) { host.style.display = 'none'; host.innerHTML = ''; return; }
+    host.style.display = 'block';
+    const series = overviewSeries(ovRange);
+    const W = 600, H = 170, padL = 6, padR = 6, padT = 14, padB = 4;
+    let svg, xlabels = '';
+    if (series.length < 2) {
+      svg = '<div class="ov-empty">Log a few days to see your completion trend here.</div>';
+    } else {
+      const n = series.length;
+      const xFor = i => padL + i / (n - 1) * (W - padL - padR);
+      const yFor = v => (H - padB) - (v / 100) * (H - padT - padB);
+      const pts = series.map((p, i) => ({ x: xFor(i), y: yFor(p.pct) }));
+      const line = smoothPath(pts);
+      const area = line + ' L ' + pts[n - 1].x.toFixed(1) + ' ' + (H - padB) + ' L ' + pts[0].x.toFixed(1) + ' ' + (H - padB) + ' Z';
+      const last = pts[n - 1];
+      svg = '<svg class="ov-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
+        '<defs><linearGradient id="ovFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(139,92,246,0.55)"/><stop offset="100%" stop-color="rgba(139,92,246,0.04)"/></linearGradient></defs>' +
+        '<path d="' + area + '" fill="url(#ovFill)"/>' +
+        '<path d="' + line + '" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>' +
+        '<circle cx="' + last.x.toFixed(1) + '" cy="' + last.y.toFixed(1) + '" r="4" fill="#fff" stroke="var(--accent)" stroke-width="2"/></svg>';
+      const idxs = [...new Set([0, Math.floor((n - 1) / 2), n - 1])];
+      xlabels = '<div class="ov-x">' + idxs.map(i => '<span>' + series[i].label + '</span>').join('') + '</div>';
+    }
+    const lastPct = series.length ? Math.round(series[series.length - 1].pct) + '%' : '—';
+    host.innerHTML = '<div class="sec-head"><span class="sec-title">Completion rate</span><span class="ov-now">' + lastPct + '</span></div>' +
+      '<div class="chart-card">' +
+      '<div class="seg ov-seg">' + OV_RANGES.map(([lbl, k]) => '<button data-ov="' + k + '" class="' + (k === ovRange ? 'on' : '') + '">' + lbl + '</button>').join('') + '</div>' +
+      '<div class="ov-chart-wrap">' + svg + '</div>' + xlabels + '</div>';
+    host.querySelectorAll('[data-ov]').forEach(b => b.onclick = () => { ovRange = b.dataset.ov; renderOverview(); });
+  }
+
+  // ---- Edit / create habit ----
+  function openEditHabit(habit, onClose) {
+    const isNew = !habit;
+    const draft = habit ? JSON.parse(JSON.stringify(habit)) : {
+      id: uid(), name: '', description: '', color: PALETTE[12],
+      icon: { type: 'icon', value: 'pulse' }, tracking: 'step', perDay: 1, target: 1, unit: '',
+      streakGoal: null, category: null, restDays: [], createdAt: Date.now(), order: state.habits.length
+    };
+    let advOpen = !isNew && (draft.streakGoal || draft.category);
+
+    function syncFromForm() {
+      const n = $('ehName'); if (n) draft.name = n.value;
+      const d = $('ehDesc'); if (d) draft.description = d.value;
+      const u = $('ehUnit'); if (u) draft.unit = u.value;
+    }
+    function render() {
+      const colors = PALETTE.map(c => '<button class="swatch' + (c === draft.color ? ' on' : '') + '" data-color="' + c + '" style="background:' + c + '"></button>').join('');
+      const stepBody = '<div class="hint">Increment by 1 with each completion</div>' +
+        '<div class="field-label">Completions per day</div>' +
+        '<div class="stepper"><div class="val" id="ehPerVal">' + (draft.perDay || 1) + ' <small>/ day</small></div>' +
+        '<button class="step-b" id="ehMinus">–</button><button class="step-b" id="ehPlus">+</button></div>' +
+        '<div class="hint">The square fills completely when this number is met</div>';
+      const valBody = '<div class="hint">Enter a value each day; the square fills toward your target</div>' +
+        '<div class="row2"><div><div class="field-label">Daily target</div><input class="field-input" id="ehTarget" inputmode="decimal" value="' + (draft.target || 1) + '"></div>' +
+        '<div><div class="field-label">Unit (optional)</div><input class="field-input" id="ehUnit" value="' + escapeHtml(draft.unit || '') + '" placeholder="e.g. min"></div></div>';
+      openSheet(
+        '<div class="eh-head"><button class="icon-btn" id="ehCancel" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
+          '<div class="sheet-title">' + (isNew ? 'New Habit' : 'Edit Habit') + '</div><span style="width:38px"></span></div>' +
+        '<div class="eh-icon-pick"><button class="eh-icon-btn" id="ehIcon" style="color:' + draft.color + '">' + iconMarkup(draft.icon, draft.color) + '</button></div>' +
+        '<div class="eh-icon-hint">Tap to choose an icon or emoji</div>' +
+        '<div class="field-label">Name</div><input class="field-input" id="ehName" value="' + escapeHtml(draft.name) + '" placeholder="e.g. Study" autocomplete="off">' +
+        '<div class="field-label">Description</div><textarea class="field-input" id="ehDesc" rows="2" placeholder="Optional">' + escapeHtml(draft.description || '') + '</textarea>' +
+        '<div class="field-label">Color</div><div class="color-grid" id="ehColors">' + colors + '</div>' +
+        '<button class="adv-toggle' + (advOpen ? ' open' : '') + '" id="ehAdvToggle">Advanced options <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button>' +
+        '<div class="adv-body' + (advOpen ? ' open' : '') + '" id="ehAdv">' +
+          '<div class="row2"><div><div class="field-label">Streak goal</div><button class="picker-row" id="ehStreak"><span>' + (draft.streakGoal ? draft.streakGoal + ' days' : 'None') + '</span><span class="chev">›</span></button></div>' +
+          '<div><div class="field-label">Category</div><button class="picker-row" id="ehCat"><span>' + (draft.category ? escapeHtml(draft.category) : 'None') + '</span><span class="chev">›</span></button></div></div>' +
+          '<div class="field-label">Rest days</div><div class="rd-row" id="ehRest">' + restDayButtons(draft) + '</div>' +
+          '<div class="hint" style="text-align:left">Tapped days are skipped — they won\u2019t break your streak or count against completion.</div>' +
+        '</div>' +
+        '<div class="field-label">How should completions be tracked?</div>' +
+        '<div class="seg" id="ehSeg"><button data-track="step" class="' + (draft.tracking === 'step' ? 'on' : '') + '">Step by step</button>' +
+          '<button data-track="value" class="' + (draft.tracking === 'value' ? 'on' : '') + '">Custom value</button></div>' +
+        '<div id="ehTrackBody">' + (draft.tracking === 'value' ? valBody : stepBody) + '</div>' +
+        '<div class="sheet-actions"><button class="btn-primary" id="ehSave" style="flex:1"' + (draft.name.trim() ? '' : ' disabled') + '>' + (isNew ? 'Create Habit' : 'Save') + '</button></div>' +
+        (isNew ? '' : '<button class="btn-danger" id="ehDelete">Delete Habit</button>')
+      );
+      bind();
+    }
+    function bind() {
+      $('ehCancel').onclick = () => { if (onClose) { sheetOnClose = null; closeSheet(); onClose(); } else closeSheet(); };
+      $('ehName').oninput = () => { draft.name = $('ehName').value; $('ehSave').disabled = !draft.name.trim(); };
+      $('ehColors').querySelectorAll('[data-color]').forEach(b => b.onclick = () => { draft.color = b.dataset.color; syncFromForm(); render(); });
+      $('ehIcon').onclick = () => { syncFromForm(); openIconPicker(draft.icon, ic => { draft.icon = ic; render(); }); };
+      $('ehAdvToggle').onclick = () => { advOpen = !advOpen; $('ehAdv').classList.toggle('open', advOpen); $('ehAdvToggle').classList.toggle('open', advOpen); };
+      $('ehStreak').onclick = () => { syncFromForm(); promptSheet({ title: 'Streak goal', sub: 'Days in a row (leave blank for none)', value: draft.streakGoal || '', numeric: true, onSave: v => { const n = parseInt(v, 10); draft.streakGoal = (!v || isNaN(n) || n <= 0) ? null : n; render(); } }); };
+      $('ehCat').onclick = () => { syncFromForm(); openCategoryPicker(draft.category, c => { draft.category = c; render(); }); };
+      const restWrap = $('ehRest');
+      if (restWrap) restWrap.querySelectorAll('[data-rd]').forEach(b => b.onclick = () => { const idx = +b.dataset.rd; draft.restDays = draft.restDays || []; const i = draft.restDays.indexOf(idx); if (i >= 0) draft.restDays.splice(i, 1); else draft.restDays.push(idx); b.classList.toggle('on'); });
+      $('ehSeg').querySelectorAll('[data-track]').forEach(b => b.onclick = () => { draft.tracking = b.dataset.track; syncFromForm(); render(); });
+      const minus = $('ehMinus'), plus = $('ehPlus');
+      if (minus) minus.onclick = () => { draft.perDay = Math.max(1, (draft.perDay || 1) - 1); $('ehPerVal').innerHTML = draft.perDay + ' <small>/ day</small>'; };
+      if (plus) plus.onclick = () => { draft.perDay = (draft.perDay || 1) + 1; $('ehPerVal').innerHTML = draft.perDay + ' <small>/ day</small>'; };
+      const tgt = $('ehTarget'); if (tgt) tgt.oninput = () => { const n = parseFloat(tgt.value); draft.target = isNaN(n) || n <= 0 ? 1 : n; };
+      $('ehSave').onclick = () => {
+        syncFromForm();
+        if (!draft.name.trim()) return;
+        draft.name = draft.name.trim();
+        if (draft.tracking === 'step') { draft.perDay = draft.perDay || 1; }
+        else { draft.target = draft.target || 1; }
+        const existing = state.habits.findIndex(x => x.id === draft.id);
+        if (existing >= 0) state.habits[existing] = draft; else state.habits.push(draft);
+        save();
+        sheetOnClose = null; closeSheet();
+        if (onClose) onClose(); else render2();
+        toast(isNew ? 'Habit created' : 'Saved');
+      };
+      const del = $('ehDelete');
+      if (del) del.onclick = () => confirmSheet({ title: 'Delete habit?', body: 'This removes "' + draft.name + '" and all its logged history.', confirmLabel: 'Delete', danger: true,
+        onConfirm: () => { state.habits = state.habits.filter(x => x.id !== draft.id); delete state.logs[draft.id]; save(); render2(); toast('Habit deleted'); } });
+    }
+    render();
+  }
+  function render2() { render(); }
+
+  function openCategoryPicker(current, onPick) {
+    const cats = [...new Set(state.habits.map(h => h.category).filter(Boolean))];
+    openSheet(
+      '<div class="sheet-title">Category</div>' +
+      '<div style="margin-top:16px">' +
+        '<button class="picker-row" data-pickcat="" style="margin-bottom:10px"><span>None</span>' + (!current ? '<span class="chev">✓</span>' : '') + '</button>' +
+        cats.map(c => '<button class="picker-row" data-pickcat="' + escapeHtml(c) + '" style="margin-bottom:10px"><span>' + escapeHtml(c) + '</span>' + (current === c ? '<span class="chev">✓</span>' : '') + '</button>').join('') +
+      '</div>' +
+      '<button class="btn-soft" id="catNew" style="margin-top:6px">+ New category</button>'
+    );
+    document.querySelectorAll('[data-pickcat]').forEach(b => b.onclick = () => { sheetOnClose = null; closeSheet(); onPick(b.dataset.pickcat || null); });
+    $('catNew').onclick = () => promptSheet({ title: 'New category', placeholder: 'e.g. Health', onSave: v => { const t = (v || '').trim(); sheetOnClose = null; closeSheet(); onPick(t || null); } });
+  }
+
+  // ---- Icon picker ----
+  function openIconPicker(current, onPick) {
+    let tab = (current && current.type === 'emoji') ? 'emoji' : 'icon';
+    let q = '';
+    function render() {
+      let body = '';
+      if (tab === 'icon') {
+        ICON_CATS.forEach(([cat, map]) => {
+          const keys = Object.keys(map).filter(k => !q || k.includes(q) || cat.toLowerCase().includes(q));
+          if (!keys.length) return;
+          body += '<div class="ip-cat">' + cat + '</div><div class="ip-grid">' +
+            keys.map(k => '<button class="ip-cell' + (current && current.type === 'icon' && current.value === k ? ' on' : '') + '" data-ic="' + k + '">' + ICONS[k] + '</button>').join('') + '</div>';
+        });
+        if (!body) body = '<div class="empty">No icons match.</div>';
+      } else {
+        const list = EMOJI.filter(([ch, name]) => !q || name.includes(q));
+        body = '<div class="ip-grid" style="margin-top:14px">' +
+          (list.length ? list.map(([ch]) => '<button class="ip-cell' + (current && current.type === 'emoji' && current.value === ch ? ' on' : '') + '" data-em="' + ch + '"><span class="emoji">' + ch + '</span></button>').join('') : '') + '</div>' +
+          (list.length ? '' : '<div class="empty">No emoji match.</div>');
+      }
+      openSheet(
+        '<div class="ip-head"><button class="link-btn" id="ipBack">‹</button>' +
+          '<div class="ip-tabs"><button class="ip-tab' + (tab === 'icon' ? ' on' : '') + '" data-tab="icon">Icon</button>' +
+          '<button class="ip-tab' + (tab === 'emoji' ? ' on' : '') + '" data-tab="emoji">Emoji</button></div></div>' +
+        '<input class="field-input" id="ipSearch" placeholder="Search" value="' + escapeHtml(q) + '" autocomplete="off">' +
+        '<div id="ipBody">' + body + '</div>'
+      );
+      $('ipBack').onclick = closeSheet;
+      document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; render(); });
+      $('ipSearch').oninput = () => { q = $('ipSearch').value.trim().toLowerCase(); const sel = document.activeElement; render(); const s = $('ipSearch'); if (s) { s.focus(); } };
+      document.querySelectorAll('[data-ic]').forEach(b => b.onclick = () => { sheetOnClose = null; closeSheet(); onPick({ type: 'icon', value: b.dataset.ic }); });
+      document.querySelectorAll('[data-em]').forEach(b => b.onclick = () => { sheetOnClose = null; closeSheet(); onPick({ type: 'emoji', value: b.dataset.em }); });
+    }
+    render();
+  }
+
+  // ---- Sheet system ----
+  let sheetOnClose = null;
+  function openSheet(html, onClose) {
+    $('sheet').innerHTML = html;
+    $('sheet').scrollTop = 0;
+    $('overlay').classList.add('open');
+    sheetOnClose = onClose || null;
+  }
+  function closeSheet() {
+    $('overlay').classList.remove('open');
+    detailRefresh = null;
+    if (sheetOnClose) { const f = sheetOnClose; sheetOnClose = null; f(); }
+  }
+  $('overlay').addEventListener('click', e => { if (e.target === $('overlay')) closeSheet(); });
+
+  function confirmSheet(o) {
+    openSheet(
+      '<div class="confirm-title">' + escapeHtml(o.title) + '</div>' +
+      (o.body ? '<div class="confirm-body">' + escapeHtml(o.body) + '</div>' : '') +
+      '<div class="confirm-stack">' +
+        '<button class="' + (o.danger ? 'btn-confirm-red' : 'btn-confirm-accent') + '" id="cyes">' + escapeHtml(o.confirmLabel || 'Confirm') + '</button>' +
+        '<button class="btn-confirm-grey" id="cno">' + escapeHtml(o.cancelLabel || 'Cancel') + '</button>' +
+      '</div>'
+    );
+    $('cyes').onclick = () => { sheetOnClose = null; closeSheet(); o.onConfirm && o.onConfirm(); };
+    $('cno').onclick = closeSheet;
+  }
+  function promptSheet(o) {
+    openSheet(
+      '<div class="sheet-title">' + escapeHtml(o.title || '') + '</div>' +
+      (o.sub ? '<div class="confirm-body" style="margin:6px 0 0">' + escapeHtml(o.sub) + '</div>' : '') +
+      '<input class="field-input" id="psIn" style="margin-top:16px" value="' + escapeHtml(o.value == null ? '' : o.value) + '" placeholder="' + escapeHtml(o.placeholder || '') + '"' + (o.numeric ? ' inputmode="decimal"' : '') + ' autocomplete="off">' +
+      '<div class="sheet-actions"><button class="btn-soft" id="psCancel">Cancel</button><button class="btn-primary" id="psSave">Save</button></div>'
+    );
+    setTimeout(() => { try { $('psIn').focus(); } catch (e) {} }, 60);
+    $('psCancel').onclick = closeSheet;
+    $('psSave').onclick = () => { const v = $('psIn').value.trim(); sheetOnClose = null; closeSheet(); o.onSave && o.onSave(v); };
+  }
+
+  let toastT;
+  function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 1900); }
+
+  // ---- Wire global controls ----
+  $('btnAdd').onclick = () => openEditHabit(null);
+
+  // ---- First-run sample ----
+  if (!state.habits.length && !localStorage.getItem(KEY)) {
+    const sid = uid();
+    state.habits.push({ id: sid, name: 'Read', description: '20 minutes', color: PALETTE[10], icon: { type: 'icon', value: 'book' }, tracking: 'step', perDay: 1, target: 1, unit: '', streakGoal: 7, category: null, order: 0 });
+    const logs = {};
+    const t = todayMid();
+    [1, 2, 3, 5, 6, 9, 10, 12].forEach(ago => { const d = new Date(t); d.setDate(d.getDate() - ago); logs[ymd(d)] = 1; });
+    state.logs[sid] = logs;
+    save();
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
